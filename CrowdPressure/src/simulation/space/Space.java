@@ -13,9 +13,16 @@ public class Space {
     public Space(){
         walls_ = new LinkedList<>();
     }
+    public Space (LinkedList<Wall> walls) {
+        walls_ = walls;
+    }
 
     public void addWall(Wall new_wall){
         walls_.add(new_wall);
+    }
+
+    public LinkedList<Wall> getWalls() {
+        return walls_;
     }
 
 }
