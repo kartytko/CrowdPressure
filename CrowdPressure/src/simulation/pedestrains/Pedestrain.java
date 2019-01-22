@@ -2,6 +2,9 @@ package simulation.pedestrains;
 import simulation.DefaultValuesConfig;
 import simulation.Position;
 import simulation.space.Wall;
+
+import java.util.LinkedList;
+
 import static java.lang.Math.*;
 
 
@@ -24,6 +27,10 @@ public class Pedestrain {
     private boolean reached_target;
     private double crowd_pressure_;
 
+    private LinkedList<Position> recent_positions_ = new LinkedList<>();
+
+    private LinkedList<Double> actual_speeds_ = new LinkedList<>();
+
     public Pedestrain(Position start, Position target, int id){
         radius_ = DefaultValuesConfig.DEFAULT_RADIUS;
         mass_ = DefaultValuesConfig.DEFAULT_MASS;
@@ -32,12 +39,12 @@ public class Pedestrain {
         current_position_ = start;
         target_ = target;
         reached_target = false;
-        id_ = id; 
+        id_ = id;
 
         actual_velocity_ = new Position(1,1);
         direction_ = target_.normalize(current_position_);
         desired_velocity_=direction_.multiply((float)desired_speed_);
-        body_factor_ = 26000;
+        body_factor_ = 24000;
         crowd_pressure_=0;
     }
 
@@ -48,16 +55,15 @@ public class Pedestrain {
         if(current_position_.getX_()-DefaultValuesConfig.APPROXIMATION < target_.getX_() && current_position_.getX_()+DefaultValuesConfig.APPROXIMATION > target_.getX_()){
             if(current_position_.getY_()-DefaultValuesConfig.APPROXIMATION < target_.getY_() && current_position_.getY_()+DefaultValuesConfig.APPROXIMATION > target_.getY_()){
                 reached_target = true;
-                System.out.println("REACHED");
+                System.out.println(this.id_+": REACHED TARGET");
             }
         }
     }
 
 
     public Position calculateInteractionWithNeighbour(Pedestrain neighbour, double A, double B){
-        // TO-DO: Dokładny(!) research, ile powinien wynosić współczynnik A i B.
-        A=1;
-        B=0.8;
+        A = this.mass_*this.desired_speed_/this.relaxation_time_;
+        B = 1;
 
         // Nie obliczamy interakcji, jeśli sąsiad dotarł do celu.
         if(neighbour.reachedTarget()){
@@ -73,9 +79,10 @@ public class Pedestrain {
         // cos(phi) = -n*e       , gdzie phi to kąt pomiędzy e=v/|v|, a -n
         Position n = this.current_position_.normalize(neighbour.current_position_); // Wektor od agenta do sąsiada (n).
         Position minus_n = n.multiply(-1);
-        Position actual_velocity = this.getActual_velocity_();
+        Position actual_velocity =   this.getActual_velocity_();
         Position e = actual_velocity.multiply(1/actual_velocity.calculateLenght()); // e = v(t)/||v(t)||
 
+        // Iloczyn skalarny wektorów podzielony przez iloczyn długości wektorów daje cosinus kąta.
         // Iloczyn skalarny wektorów podzielony przez iloczyn długości wektorów daje cosinus kąta.
         double scalar = minus_n.multiply(e).getX_()+minus_n.multiply(e).getY_();
         double n_lenght = minus_n.calculateLenght();
@@ -83,13 +90,11 @@ public class Pedestrain {
         double cosinus = scalar/(e_lenght*n_lenght);
 
         Position social_force = n.multiply((A*exp((r-d)/B))).multiply((1+cosinus)/2);
-        System.out.println("ID: "+this.id_ + "; Neighbour social force: "+ social_force.calculateLenght());
 
 
         // BODY FORCE
         // body_force = k*g(r-d)*n
         Position body_force = n.multiply((this.body_factor_*max(0,(r-d))));
-        System.out.println("ID: "+this.id_ + "; Neighbour body force: "+ body_force.calculateLenght());
 
 
 
@@ -101,8 +106,6 @@ public class Pedestrain {
         Position deltaVt = (neighbour.getActual_velocity_().subtract(this.getActual_velocity_())).multiply(t);
 
         Position sliding_friction_force = deltaVt.multiply(max(0, (r-d))).multiply(t);
-        System.out.println("ID: "+this.id_ + "; Neighbour sliding friction: "+ sliding_friction_force.calculateLenght());
-
 
         return social_force.add(body_force).add(sliding_friction_force);
     }
@@ -112,108 +115,52 @@ public class Pedestrain {
         // {A*exp((r-d)/B)+ kq(r-d)}*n - g(r-d)(v*t)*t
         if(this.reachedTarget()){return new Position(0,0);}
 
-        // TO-DO: Porządny(!) research, ile powinien wynosić współczynnik A i B.
-        double A=1;
-        double B=0.8;
 
-        double r= this.radius_;
-        double d = calculateDistanceToWall(wall, this.current_position_);
+        double A = (-1)*this.mass_*this.desired_speed_/(25*this.relaxation_time_);
+        double B = 5;
 
-        // można wywalić
+        double r = this.radius_;
+        double d = wall.calculateDistanceToWall(this.current_position_);
+
+        // niepotrzbne
         if(d==7777.7){
             return new Position(0,0);
         }
 
         // BODY FORCE
         // body_force = {A*exp((r-d)/B)+ kq(r-d)}*n;
-        Position cross_point = calculateCrossPoint(wall, this.current_position_);
+        Position cross_point = wall.calculateCrossPoint(this.current_position_);
         Position n = current_position_.normalize(cross_point);
         Position t = new Position(n.getY_()*(-1), n.getX_()); // t=(-n2, n1) <-- tangential direction   n=(n1, n2)
 
         Position body_force = n.multiply(A*exp((r-d)/B) + this.body_factor_*max(0, (r-d)));
-        System.out.println("ID: "+this.id_ + "; Wall body force: " + body_force.calculateLenght());
 
 
         // SLIDING FRICTION
         // sliding_friction_force = g(r-d)(v*t)*t  <-- artykuł: Vicsek, Farkas
         // v*t=cos(phi) (wyliczanie analogicznie do sliding friction dla interakcji z sąsiadem)
-        double scalar = this.getActual_velocity_().multiply(t).getX_()+this.getActual_velocity_().multiply(t).getY_();
+        //double scalar = this.getActual_velocity_().multiply(t).getX_()+this.getActual_velocity_().multiply(t).getY_();
+        double scalar = this.getActual_velocity_().getX_()*t.getX_()+this.getActual_velocity_().getY_()*t.getY_();
         double v_lenght = this.getActual_velocity_().calculateLenght();
         double t_lenght = t.calculateLenght();
         double cosinus = scalar/(t_lenght*v_lenght);
         // ALTERNATYWA: Position sliding_friction_force = t.multiply(cosinus*this.body_factor_*max(0,(r-d))); //Vicsek&Farkas
 
-
         // sliding_friction_force = g(r-d)*k*t  <-- artykuł: Lakoba, Kaup, Finkelstein (rozszerzenie Vicseka i Farkasa)
         Position sliding_friction_force = t.multiply(max(0,(r-d))*this.body_factor_);
-        System.out.println("ID: "+this.id_ + "; Wall sliding: " +sliding_friction_force.calculateLenght());
 
         return body_force.add(sliding_friction_force);
         // ALTERNATYWA: return body_force.subtract(sliding_friction_force);  //Vicsek&Farkas
     }
 
-    public Position calculateCrossPoint(Wall wall, Position current_position){
-        // a_wall = A = (y2 - y1)/(x2 - x1); <-- współczynnik prostej zawierającej w sobie ścianę wall
-        double a_wall = (wall.getEnd().getY_()-wall.getBegin().getY_())/(wall.getEnd().getX_()-wall.getBegin().getX_());
-        double b_wall = wall.getBegin().getY_() - a_wall*wall.getBegin().getX_();
-        double x=0;
-        double y=0;
-        if(a_wall!=0) {
-            // a = -1/a_wall <-- współczynnik prostej prostopadłej
-            double a = (-1) / a_wall;
-            // b = y - a*x <-- wspólczynnik prostej prostopadłej przechodzącej przez current_position
-            double b = current_position.getY_() - a * current_position.getX_();
-            if (a_wall != a) {
-                x = (b - b_wall) / (a_wall - a);
-                y = a_wall * x + b_wall;
-            }
+
+    public Double calculateMeanVelocity(){
+        Double sum = 0.0;
+        for(Double d : actual_speeds_){
+            sum += d;
         }
-
-        // TO-DO: Implementacja dla ścian pionowych i poziomych (tam, gdzie a=0).
-        return new Position(x, y);
+        return sum/actual_speeds_.size();
     }
-
-
-
-    // Odległość punktu od prostej.
-    // dist = abs(Ax0+By0+C)/sqrt(A*A+B*B)
-    public double calculateDistanceToWall(Wall wall, Position current_position){
-        // a = A = (y2 - y1)/(x2 - x1);
-        double A = (wall.getEnd().getY_()-wall.getBegin().getY_())/(wall.getEnd().getX_()-wall.getBegin().getX_());
-        // B = -1
-        double B = -1;
-        // y1 = a*x1 + b
-        // b = C = y1 - a * x1;
-        // b = C = y2 - a * x2
-        double C = wall.getEnd().getY_() - A*wall.getEnd().getX_();
-        double x0 = current_position.getX_();
-        double y0 = current_position.getY_();
-        if(checkIfPointIsInBetween(current_position, wall.getBegin(), wall.getEnd())){
-            return (abs(A*x0+B*y0+C))/(sqrt(A*A+B*B));
-        }
-        return 7777.7;  //hard coded
-    }
-
-
-
-    public static boolean checkIfPointIsInBetween(Position point, Position start, Position end) {
-        double x = point.getX_();
-        double y = point.getY_();
-        double x1 = start.getX_();
-        double y1 = start.getY_();
-        double x2 = end.getX_();
-        double y2 = end.getY_();
-
-        return (((x1 - DefaultValuesConfig.APPROXIMATION2 <= x
-                && x <= x2 + DefaultValuesConfig.APPROXIMATION2)
-                || (x2 - DefaultValuesConfig.APPROXIMATION2 <= x
-                && x <= x1 + DefaultValuesConfig.APPROXIMATION2))
-                && ((y1 - DefaultValuesConfig.APPROXIMATION2 <= y
-                && y <= y2 + DefaultValuesConfig.APPROXIMATION2)
-                || (y2 - DefaultValuesConfig.APPROXIMATION2 <= y
-                && y <= y1 + DefaultValuesConfig.APPROXIMATION2)));
-    }
-
 
     // Wyznacza siłę, która bierze pod uwagę aktualną i preferowaną prędkość.
     // siła = (masa * (prędkość_preferowana - prędkość_aktualna))/czas_relaksacji
@@ -276,5 +223,18 @@ public class Pedestrain {
     public double getDesired_speed_() {
         return this.desired_speed_;
     }
+
+    public LinkedList<Position> getRecent_positions_() {
+        return recent_positions_;
+    }
+
+    public void setRecent_positions_(LinkedList<Position> recent_positions_) {
+        this.recent_positions_ = recent_positions_;
+    }
+
+    public LinkedList<Double> getActual_speeds_() {
+        return actual_speeds_;
+    }
+
 
 }

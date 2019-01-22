@@ -42,7 +42,6 @@ public class Position {
     }
 
 
-
     public Position multiply (double number){
         double x = this.getX_()*number;
         double y = this.getY_()*number;

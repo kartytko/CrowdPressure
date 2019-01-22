@@ -25,4 +25,11 @@ public class Space {
         return walls_;
     }
 
+    public Position getStart_() {
+        return start_;
+    }
+
+    public Position getEnd_() {
+        return end_;
+    }
 }

@@ -2,10 +2,37 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.canvas.Canvas?>
 
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.ComboBox?>
 <GridPane fx:controller="simulation.Controller"
           xmlns:fx="http://javafx.com/fxml" alignment="center" hgap="10" vgap="10">
 
             <Canvas fx:id="canvas" height="600.0" nodeOrientation="INHERIT" width="800.0">
             </Canvas>
-    <Button fx:id="stopButton" maxWidth="90.0" minWidth="90.0" mnemonicParsing="false" onAction="#stopLoop" prefWidth="90.0" text="Stop" />
+    <!--<Button fx:id="stopButton" maxWidth="90.0" minWidth="90.0" mnemonicParsing="false" onAction="#stopLoop" prefWidth="90.0" text="Start/Stop" />-->
+
+    <HBox alignment="TOP_RIGHT" spacing="10.0">
+        <children>
+            <Button fx:id="stopButton" maxWidth="90.0" minWidth="90.0" mnemonicParsing="false" onAction="#stopLoop" prefWidth="90.0" text="Start" />
+            <Button fx:id="printVelocity" maxWidth="180.0" minWidth="140.0" mnemonicParsing="false" onAction="#printSpeed" prefWidth="90.0" text="Speed statistics" />
+            <Region prefWidth="100.0" HBox.hgrow="ALWAYS" />
+            <ComboBox fx:id="symulationType"  promptText="Symulation Type" />
+            <ComboBox fx:id="markTrajectory"  promptText="Mark Trajectory" />
+            <Region layoutX="250.0" layoutY="10.0" prefWidth="100.0" />
+            <VBox alignment="CENTER">
+                <children>
+                </children>
+                <HBox.margin>
+                    <Insets left="10.0" />
+                </HBox.margin>
+            </VBox>
+
+        </children>
+    </HBox>
+
 </GridPane>
